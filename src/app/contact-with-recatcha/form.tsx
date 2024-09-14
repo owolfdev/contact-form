@@ -7,6 +7,7 @@ import { sendContactMessage } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import ReCAPTCHA from "react-google-recaptcha";
 import {
   Select,
   SelectContent,
@@ -20,12 +21,19 @@ const initialState = {
   message: "",
 };
 
-function SubmitButton() {
+const NEXT_PUBLIC_RECAPTCHA_SITE_KEY =
+  process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+
+function SubmitButton({
+  isRecaptchaVerified,
+}: {
+  isRecaptchaVerified: boolean;
+}) {
   const { pending } = useFormStatus();
   return (
     <Button
-      aria-disabled={pending}
-      disabled={pending}
+      aria-disabled={pending || !isRecaptchaVerified}
+      disabled={pending || !isRecaptchaVerified}
       type="submit"
       className="text-lg outline"
     >
@@ -37,9 +45,21 @@ function SubmitButton() {
 export default function ContactForm() {
   const [state, formAction] = useFormState(sendContactMessage, initialState);
 
+  const [recaptchaSiteKey] = React.useState<string>(
+    NEXT_PUBLIC_RECAPTCHA_SITE_KEY || ""
+  );
+  const recaptchaRef = React.useRef<ReCAPTCHA>(null); // Create ref for ReCAPTCHA
+
+  const [isRecaptchaVerified, setIsRecaptchaVerified] =
+    React.useState<boolean>(false);
+
   const [selectedType, setSelectedType] = React.useState<string | undefined>(
     undefined
   ); // Track the selected value in the Select
+
+  const handleRecaptchaChange = (token: string | null) => {
+    setIsRecaptchaVerified(token !== null);
+  };
 
   // Create a ref for the form element
   const formRef = React.useRef<HTMLFormElement>(null);
@@ -50,7 +70,10 @@ export default function ContactForm() {
       if (formRef.current) {
         formRef.current.reset(); // Reset the form fields
       }
-
+      if (recaptchaRef.current) {
+        recaptchaRef.current.reset(); // Reset ReCAPTCHA
+        setIsRecaptchaVerified(false); // Reset recaptcha verification
+      }
       setSelectedType(undefined); // Reset the Select component
       alert(state.message); // Optional alert to notify the user
     }
@@ -81,9 +104,17 @@ export default function ContactForm() {
       <Input type="text" id="email" name="email" required />
       <label htmlFor="message">Enter Message</label>
       <Textarea id="message" name="message" required />
-
+      <div className="pt-4">
+        {recaptchaSiteKey && (
+          <ReCAPTCHA
+            sitekey={recaptchaSiteKey}
+            onChange={handleRecaptchaChange}
+            ref={recaptchaRef} // Attach the ReCAPTCHA ref here
+          />
+        )}
+      </div>
       <div className="pt-2">
-        <SubmitButton />
+        <SubmitButton isRecaptchaVerified={isRecaptchaVerified} />
       </div>
       <p aria-live="polite" className="sr-only" role="status">
         {state?.message}
